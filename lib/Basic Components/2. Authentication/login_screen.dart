@@ -6,6 +6,8 @@ import '../../core/models/app_user.dart';
 import '../../core/shared/utils/user_provider.dart' as user_provider;
 import '../../core/services/auth_service.dart';
 import '../../core/shared/constants/app_colors.dart' as app_colors;
+import '../../core/services/account_verification_service.dart';
+import '../../core/shared/widgets/auth_success_message.dart';
 
 /// شاشة تسجيل الدخول
 /// تم تعديلها لدعم تسجيل الدخول عبر Magic Link وفيسبوك والدخول كزائر فقط
@@ -17,9 +19,6 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  // خدمة المصادقة
-  final _authService = AuthService();
-
   // متغيرات الحالة
   bool _isLoading = false;
   String? _selectedAccountType; // للدخول الاجتماعي
@@ -37,42 +36,6 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  /// التحقق من تأكيد البريد الإلكتروني
-  Future<void> _checkEmailVerification() async {
-    try {
-      final Session? session = Supabase.instance.client.auth.currentSession;
-      if (session != null) {
-        await Supabase.instance.client.auth.refreshSession();
-      }
-
-      final user = Supabase.instance.client.auth.currentUser;
-      if (user != null) {
-        if (user.emailConfirmedAt != null) {
-          if (!mounted) return;
-          Navigator.pushReplacementNamed(context, '/home');
-        } else {
-          if (!mounted) return;
-          _showEmailVerificationMessage();
-        }
-      }
-    } catch (e) {
-      debugPrint('خطأ في التحقق من تأكيد البريد الإلكتروني: ${e.toString()}');
-    }
-  }
-
-  /// عرض رسالة تأكيد البريد الإلكتروني
-  void _showEmailVerificationMessage() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'يرجى تأكيد بريدك الإلكتروني للمتابعة. تحقق من صندوق الوارد الخاص بك.',
-        ),
-        backgroundColor: Colors.orange,
-        duration: Duration(seconds: 5),
-      ),
-    );
-  }
-
   /// إرسال رابط سحري لتسجيل الدخول
   Future<void> _sendMagicLink() async {
     final email = _magicLinkController.text.trim();
@@ -86,9 +49,14 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       await Supabase.instance.client.auth.signInWithOtp(
         email: email,
+        emailRedirectTo:
+            'com.example.tamwuilk://home_screen/auth?auth_success=true&user_role=$_selectedAccountType',
+        data: {'user_role': _selectedAccountType},
       );
       if (!mounted) return;
-      _showSuccessMessage('تم إرسال رابط سحري إلى بريدك الإلكتروني');
+      _showSuccessMessage(
+        'تم إرسال رابط سحري إلى بريدك الإلكتروني. يرجى التحقق من صندوق الوارد والنقر على الرابط لتأكيد حسابك.',
+      );
     } on AuthException catch (error) {
       if (!mounted) return;
       _showErrorMessage(error.message);
@@ -104,34 +72,151 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  /// التحقق من تأكيد البريد الإلكتروني
+  Future<void> _checkEmailVerification() async {
+    try {
+      final Session? session = Supabase.instance.client.auth.currentSession;
+      if (session != null) {
+        await Supabase.instance.client.auth.refreshSession();
+      }
+
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user != null) {
+        if (user.emailConfirmedAt != null) {
+          // استخراج نوع الحساب من البيانات المخزنة في الجلسة
+          final accountType =
+              session?.user.userMetadata?['user_role'] ??
+              (await Supabase.instance.client
+                  .from('profiles')
+                  .select('user_role')
+                  .eq('id', user.id)
+                  .maybeSingle())?['user_role'] ??
+              'investor';
+
+          // معالجة استجابة المصادقة
+          await _handleAuthResponse(user, accountType);
+        } else {
+          if (!mounted) return;
+          _showEmailVerificationMessage();
+        }
+      }
+    } catch (e) {
+      debugPrint('خطأ في التحقق من تأكيد البريد الإلكتروني: ${e.toString()}');
+      if (!mounted) return;
+      _showErrorMessage(e.toString());
+    }
+  }
+
+  /// عرض رسالة تأكيد البريد الإلكتروني
+  void _showEmailVerificationMessage() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'يرجى تأكيد بريدك الإلكتروني للمتابعة. تحقق من صندوق الوارد الخاص بك والنقر على الرابط السحري المرسل.',
+        ),
+        backgroundColor: Colors.orange,
+        duration: Duration(seconds: 6),
+      ),
+    );
+  }
+
+  /// عرض Dialog لاختيار نوع الحساب
+  Future<String?> _showAccountTypeDialog() async {
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        String? selectedType;
+        return AlertDialog(
+          title: const Text('اختر نوع الحساب'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              RadioListTile<String>(
+                title: const Text('مستثمر'),
+                value: 'investor',
+                groupValue: selectedType,
+                onChanged: (value) {
+                  selectedType = value;
+                  setState(() {});
+                  Navigator.of(context).pop(value);
+                },
+              ),
+              RadioListTile<String>(
+                title: const Text('صاحب مشروع'),
+                value: 'project_owner',
+                groupValue: selectedType,
+                onChanged: (value) {
+                  selectedType = value;
+                  setState(() {});
+                  Navigator.of(context).pop(value);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   /// تسجيل الدخول باستخدام فيسبوك
   Future<void> _signInWithFacebook() async {
+    // إذا لم يتم اختيار نوع الحساب، اعرض Dialog للاختيار
     if (_selectedAccountType == null) {
-      _showErrorMessage('يرجى اختيار نوع الحساب لتسجيل الدخول عبر فيسبوك');
-      return;
+      final selected = await _showAccountTypeDialog();
+      if (selected == null) {
+        _showErrorMessage('يرجى اختيار نوع الحساب');
+        return;
+      }
+      setState(() {
+        _selectedAccountType = selected;
+      });
     }
+
     setState(() {
       _isLoading = true;
     });
 
     try {
-      final result = await _authService.signInWithOAuth(OAuthProvider.facebook);
+      final result = await AuthService.signInWithFacebook(
+        userRole: _selectedAccountType!,
+      );
 
-      if (result) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('جاري تسجيل الدخول عبر فيسبوك...')),
-        );
+      if (result['success'] == true) {
+        if (result['user'] != null) {
+          // إنشاء كائن AppUser من البيانات المستلمة
+          final userData = result['user'];
+          final appUser = AppUser(
+            id: userData['id'],
+            email: userData['email'] ?? '',
+            userRole: _selectedAccountType!,
+          );
+
+          // تعيين المستخدم في مزود الحالة
+          if (!mounted) return;
+          Provider.of<user_provider.UserProvider>(
+            context,
+            listen: false,
+          ).setAppUser(appUser);
+
+          // التحقق من الملف الشخصي أو إنشاؤه
+          await AccountVerificationService.checkOrCreateProfile(
+            _selectedAccountType!,
+          );
+
+          // توجيه المستخدم إلى الشاشة الرئيسية مع رسالة نجاح
+          if (!mounted) return;
+          Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
+          _showSuccessMessage('مرحبًا بك من جديد! تم تسجيل الدخول بنجاح.');
+        }
       } else {
-        if (!mounted) return;
-        _showErrorMessage('فشل في بدء عملية تسجيل الدخول عبر فيسبوك');
+        // عرض رسالة الخطأ
+        final errorMessage = result['error'] ?? 'حدث خطأ غير متوقع';
+        _showErrorMessage(errorMessage);
       }
-    } on AuthException catch (e) {
+    } catch (error) {
       if (!mounted) return;
-      _showErrorMessage('خطأ في المصادقة: ${e.message}');
-    } catch (e) {
-      if (!mounted) return;
-      _showErrorMessage('حدث خطأ أثناء تسجيل الدخول: $e');
+      _showErrorMessage('حدث خطأ غير متوقع: $error');
     } finally {
       if (mounted) {
         setState(() {
@@ -141,44 +226,42 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  /// تسجيل الدخول كزائر
-  void _loginAsGuest() {
+  /// تسجيل الدخول كضيف
+  Future<void> _loginAsGuest() async {
     showDialog(
       context: context,
-      builder: (BuildContext dialogContext) {
+      builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('تنبيه'),
-          content: const Directionality(
-            textDirection: TextDirection.rtl,
-            child: Text('سيتم الدخول بصلاحيات محدودة'),
+          title: const Text('تسجيل الدخول كضيف'),
+          content: const Text(
+            'سيتم تسجيل دخولك كضيف، ولن تتمكن من الوصول إلى جميع ميزات التطبيق. هل تريد المتابعة؟',
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
               child: const Text('إلغاء'),
             ),
             TextButton(
               onPressed: () async {
-                try {
-                  Navigator.of(dialogContext).pop();
+                Navigator.of(context).pop();
+                // إنشاء مستخدم ضيف
+                final appUser = AppUser(
+                  id: 'guest-${DateTime.now().millisecondsSinceEpoch}',
+                  email: 'guest@example.com',
+                  userRole: 'guest',
+                );
 
-                  final guestUser = AppUser(
-                    id: 'guest_user_id',
-                    email: 'guest@tamwuilk.com',
-                    userRole: 'guest',
-                  );
+                // تعيين المستخدم في مزود الحالة
+                Provider.of<user_provider.UserProvider>(
+                  context,
+                  listen: false,
+                ).setAppUser(appUser);
 
-                  Provider.of<user_provider.UserProvider>(
-                    context,
-                    listen: false,
-                  ).setAppUser(guestUser);
-
-                  if (!mounted) return;
-                  Navigator.pushReplacementNamed(context, '/home');
-                } catch (e) {
-                  if (!mounted) return;
-                  _showErrorMessage('حدث خطأ أثناء تسجيل الدخول: $e');
-                }
+                // توجيه المستخدم إلى الشاشة الرئيسية
+                if (!mounted) return;
+                Navigator.pushReplacementNamed(context, '/home');
               },
               child: const Text('متابعة'),
             ),
@@ -197,13 +280,51 @@ class _LoginScreenState extends State<LoginScreen> {
 
   /// عرض رسالة نجاح
   void _showSuccessMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.green,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    showCustomSuccessMessage(context, message);
+  }
+
+  /// معالجة استجابة المصادقة بعد تسجيل الدخول
+  Future<void> _handleAuthResponse(User user, String accountType) async {
+    try {
+      // التحقق من الملف الشخصي أو إنشاؤه
+      await AccountVerificationService.checkOrCreateProfile(accountType);
+
+      // تحديث user_role في قاعدة البيانات إذا كان null
+      final profile = await Supabase.instance.client
+          .from('profiles')
+          .select('user_role')
+          .eq('id', user.id)
+          .maybeSingle();
+      if (profile != null &&
+          (profile['user_role'] == null ||
+              profile['user_role'].toString().isEmpty)) {
+        await Supabase.instance.client
+            .from('profiles')
+            .update({'user_role': accountType})
+            .eq('id', user.id);
+      }
+
+      // إنشاء كائن AppUser
+      final appUser = AppUser(
+        id: user.id,
+        email: user.email ?? '',
+        userRole: accountType,
+      );
+
+      // تعيين المستخدم في مزود الحالة
+      if (!mounted) return;
+      Provider.of<user_provider.UserProvider>(
+        context,
+        listen: false,
+      ).setAppUser(appUser);
+
+      // توجيه المستخدم إلى الشاشة الرئيسية
+      if (!mounted) return;
+      Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
+    } catch (error) {
+      if (!mounted) return;
+      _showErrorMessage(error.toString());
+    }
   }
 
   @override
@@ -252,12 +373,11 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Center(
             child: Image(
               image: const AssetImage('assets/images/image.png'),
-              errorBuilder:
-                  (context, error, stackTrace) => Icon(
-                    Icons.image_not_supported,
-                    size: 50,
-                    color: app_colors.AppColors.primary,
-                  ),
+              errorBuilder: (context, error, stackTrace) => Icon(
+                Icons.image_not_supported,
+                size: 50,
+                color: app_colors.AppColors.primary,
+              ),
             ),
           ),
         ),
@@ -379,19 +499,18 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
           elevation: 0,
         ),
-        child:
-            _isLoading
-                ? const CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                )
-                : const Text(
-                  'تسجيل الدخول عبر الرابط السحري',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
+        child: _isLoading
+            ? const CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              )
+            : const Text(
+                'تسجيل الدخول عبر الرابط السحري',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
                 ),
+              ),
       ),
     );
   }

@@ -1,7 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Tamwuilk</string>
     <string name="facebook_app_id">1610886676252599</string>
-    <string name="fb_login_protocol_scheme">fb1610886676252599</string>
     <string name="facebook_client_token">b14485c45cbe1026dc78db1e5c0d3a8f</string>
 </resources>

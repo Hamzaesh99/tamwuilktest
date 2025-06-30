@@ -132,21 +132,13 @@ class _AuthStateWidgetState extends State<AuthStateWidget>
 
   @override
   Widget build(BuildContext context) {
-    // استخدام FutureBuilder لتجنب مشاكل التركيز
-    return FutureBuilder<Session?>(
-      future: Future.value(Supabase.instance.client.auth.currentSession),
-      builder: (context, snapshot) {
-        // Check if user is authenticated
-        final session = snapshot.data;
-
-        if (session != null) {
-          // User is logged in, show home screen using Navigator
-          return const HomePage();
-        } else {
-          // User is not logged in, show welcome screen
-          return const WelcomeScreen();
-        }
-      },
-    );
+    final session = Supabase.instance.client.auth.currentSession;
+    if (session != null) {
+      // المستخدم مسجّل الدخول
+      return const HomePage();
+    } else {
+      // المستخدم غير مسجّل الدخول
+      return const WelcomeScreen();
+    }
   }
 }

@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:provider/provider.dart';
 import '../../../Routing/app_routes.dart';
 import 'package:tamwuilktest/core/services/logger_service.dart';
+import 'package:tamwuilktest/core/shared/utils/user_provider.dart'
+    as user_provider;
+import '../../../core/shared/widgets/auth_success_message.dart';
 
 class AuthCallbackScreen extends StatefulWidget {
   const AuthCallbackScreen({super.key});
@@ -14,6 +18,9 @@ class _AuthCallbackScreenState extends State<AuthCallbackScreen> {
   bool _isLoading = true;
   bool _isSuccess = false;
   String _errorMessage = '';
+
+  // إضافة متغير للتحكم في الكود المستخدم للمصادقة
+  String? code;
 
   @override
   void initState() {
@@ -52,7 +59,24 @@ class _AuthCallbackScreenState extends State<AuthCallbackScreen> {
           tag: 'AuthCallback',
         );
 
+        // تبادل الرمز للحصول على جلسة
         await client.auth.exchangeCodeForSession(code);
+
+        // تحديث بيانات المستخدم في UserProvider
+        final authUser = client.auth.currentUser;
+        if (authUser != null) {
+          // استيراد مزود المستخدم
+          if (!mounted) return; // Add mounted check before using context
+          final userProvider = Provider.of<user_provider.UserProvider>(
+            context,
+            listen: false,
+          );
+          await userProvider.setUser(authUser);
+          LoggerService.info(
+            'تم تحديث بيانات المستخدم بعد تأكيد البريد الإلكتروني',
+            tag: 'AuthCallback',
+          );
+        }
 
         LoggerService.info('تم إنشاء جلسة المستخدم بنجاح', tag: 'AuthCallback');
 
@@ -63,7 +87,7 @@ class _AuthCallbackScreenState extends State<AuthCallbackScreen> {
           });
 
           // توجيه المستخدم تلقائيًا إلى الصفحة الرئيسية بعد فترة قصيرة
-          Future.delayed(const Duration(seconds: 2), () {
+          Future.delayed(const Duration(seconds: 1), () {
             if (mounted) {
               _navigateToHome();
             }
@@ -104,103 +128,129 @@ class _AuthCallbackScreenState extends State<AuthCallbackScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: _isLoading
-              ? const CircularProgressIndicator(color: Colors.teal)
-              : _buildContent(),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF40E0D0), Colors.white],
+          ),
+        ),
+        child: Center(
+          child: Card(
+            margin: const EdgeInsets.all(16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            elevation: 8,
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: _isLoading
+                  ? _buildLoadingContent()
+                  : _isSuccess
+                  ? _buildSuccessContent()
+                  : _buildErrorContent(),
+            ),
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildContent() {
-    if (_isSuccess) {
-      return Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.check_circle_outline, color: Colors.green, size: 80),
-          const SizedBox(height: 20),
-          const Text(
-            'تم إكمال عملية المصادقة بنجاح!',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.green,
-            ),
-            textAlign: TextAlign.center,
+  Widget _buildLoadingContent() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const SizedBox(
+          width: 60,
+          height: 60,
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF40E0D0)),
+            strokeWidth: 6,
           ),
-          const SizedBox(height: 10),
-          const Text(
-            'جاري توجيهك إلى الصفحة الرئيسية...',
-            style: TextStyle(fontSize: 16),
-            textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 24),
+        const Text(
+          'جاري المصادقة...',
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF40E0D0),
           ),
-          const SizedBox(height: 20),
-          const Text(
-            'تم تسجيل الدخول بنجاح!',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 10),
-          const Text(
-            'مرحباً بك في تطبيق تمويلك',
-            style: TextStyle(fontSize: 18),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 30),
-          ElevatedButton(
-            onPressed: _navigateToHome,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.teal,
-              padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: const Text(
-              'الذهاب إلى الصفحة الرئيسية',
-              style: TextStyle(fontSize: 16, color: Colors.white),
-            ),
-          ),
-        ],
-      );
-    } else {
-      return Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.error_outline, color: Colors.red, size: 80),
-          const SizedBox(height: 20),
-          const Text(
-            'فشل تسجيل الدخول',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 10),
-          Text(
-            _errorMessage,
-            style: const TextStyle(fontSize: 16),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 30),
-          ElevatedButton(
-            onPressed: () =>
-                AppRoutes.navigateAndRemoveUntil(context, AppRoutes.login),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.teal,
-              padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: const Text(
-              'العودة إلى تسجيل الدخول',
-              style: TextStyle(fontSize: 16, color: Colors.white),
+        ),
+        const SizedBox(height: 12),
+        const Text(
+          'يرجى الانتظار بينما نقوم بإكمال عملية تسجيل الدخول',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 16),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSuccessContent() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const AuthSuccessMessage(
+          message: 'تم تسجيل الدخول بنجاح! مرحباً بك في تطبيق تمويلك',
+        ),
+        const SizedBox(height: 24),
+        ElevatedButton(
+          onPressed: _navigateToHome,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF40E0D0),
+            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
             ),
           ),
-        ],
-      );
-    }
+          child: const Text(
+            'الذهاب إلى الصفحة الرئيسية',
+            style: TextStyle(fontSize: 16, color: Colors.white),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildErrorContent() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.error_outline, color: Colors.red, size: 60),
+        const SizedBox(height: 24),
+        const Text(
+          'فشل تسجيل الدخول',
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: Colors.red,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          _errorMessage,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 16),
+        ),
+        const SizedBox(height: 24),
+        ElevatedButton(
+          onPressed: () =>
+              AppRoutes.navigateAndRemoveUntil(context, AppRoutes.login),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF40E0D0),
+            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          child: const Text(
+            'العودة إلى تسجيل الدخول',
+            style: TextStyle(fontSize: 16, color: Colors.white),
+          ),
+        ),
+      ],
+    );
   }
 }

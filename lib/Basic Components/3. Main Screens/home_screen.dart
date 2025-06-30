@@ -17,7 +17,7 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with RouteAware {
   final supabaseService = SupabaseService;
   String selectedCategory = 'جميع التخصصات';
   bool isGuestUser = false;
@@ -44,9 +44,20 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final routeObserver = ModalRoute.of(context)?.navigator?.widget.observers
+        .whereType<RouteObserver<PageRoute>>()
+        .firstOrNull;
+    routeObserver?.subscribe(this, ModalRoute.of(context)! as PageRoute);
+  }
+
   void _checkUserStatus() {
-    final AppUser? currentUser =
-        Provider.of<UserProvider>(context, listen: false).currentUser;
+    final AppUser? currentUser = Provider.of<UserProvider>(
+      context,
+      listen: false,
+    ).currentUser;
     setState(() {
       isGuestUser = currentUser?.userRole == 'guest';
     });
@@ -73,34 +84,50 @@ class _HomePageState extends State<HomePage> {
 
   late WebViewController _webViewController;
   bool _showWebView = false;
+  RouteObserver<PageRoute>? _routeObserver;
 
   void _initializeWebView() {
-    _webViewController =
-        WebViewController()
-          ..setJavaScriptMode(JavaScriptMode.unrestricted)
-          ..setBackgroundColor(const Color(0x00000000))
-          ..setNavigationDelegate(
-            NavigationDelegate(
-              onPageStarted: (String url) {
-                // يمكنك إضافة مؤشر تحميل هنا
-              },
-              onPageFinished: (String url) {
-                // إخفاء مؤشر التحميل هنا
-              },
-              onWebResourceError: (WebResourceError error) {
-                _handleNavigationBack();
-              },
-            ),
-          )
-          ..loadFlutterAsset('assets/html/Tamwuilk.html')
-          ..addJavaScriptChannel(
-            'JavaScriptChannel',
-            onMessageReceived: (JavaScriptMessage message) {
-              if (message.message == 'goToHomeScreen') {
-                _handleNavigationBack();
-              }
-            },
-          );
+    _webViewController = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(const Color(0x00000000))
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onProgress: (int progress) {
+            // يمكن إضافة مؤشر تقدم هنا
+          },
+          onPageStarted: (String url) {
+            // يمكنك إضافة مؤشر تحميل هنا
+          },
+          onPageFinished: (String url) {
+            // إخفاء مؤشر التحميل هنا
+          },
+          onWebResourceError: (WebResourceError error) {
+            // معالجة الخطأ بشكل أفضل
+            debugPrint('WebView error: ${error.description}');
+            // إذا كان الخطأ متعلق بتحميل الأصول، نعرض رسالة للمستخدم
+            if (error.isForMainFrame == true) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    'حدث خطأ أثناء تحميل المحتوى: ${error.description}',
+                  ),
+                  duration: const Duration(seconds: 3),
+                ),
+              );
+              _handleNavigationBack();
+            }
+          },
+        ),
+      )
+      ..loadFlutterAsset('assets/html/Tamwuilk.html')
+      ..addJavaScriptChannel(
+        'JavaScriptChannel',
+        onMessageReceived: (JavaScriptMessage message) {
+          if (message.message == 'goToHomeScreen') {
+            _handleNavigationBack();
+          }
+        },
+      );
   }
 
   void _handleNavigationBack() {
@@ -108,24 +135,23 @@ class _HomePageState extends State<HomePage> {
       setState(() => _showWebView = false);
       showDialog(
         context: context,
-        builder:
-            (context) => AlertDialog(
-              title: const Text('تم تسجيل الدخول بنجاح!'),
-              content: const Text('هل تريد الانتقال إلى الشاشة الرئيسية؟'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('إلغاء'),
-                ),
-                TextButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    AppRoutes.navigateTo(context, AppRoutes.home);
-                  },
-                  child: const Text('نعم'),
-                ),
-              ],
+        builder: (context) => AlertDialog(
+          title: const Text('تم تسجيل الدخول بنجاح!'),
+          content: const Text('هل تريد الانتقال إلى الشاشة الرئيسية؟'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('إلغاء'),
             ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                AppRoutes.navigateTo(context, AppRoutes.home);
+              },
+              child: const Text('نعم'),
+            ),
+          ],
+        ),
       );
     }
   }
@@ -147,9 +173,19 @@ class _HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
+    final routeObserver = ModalRoute.of(context)?.navigator?.widget.observers
+        .whereType<RouteObserver<PageRoute>>()
+        .firstOrNull;
+    routeObserver?.unsubscribe(this);
     _timer?.cancel();
     _pageController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didPopNext() {
+    // Called when coming back to this page
+    _checkUserStatus();
   }
 
   @override
@@ -189,26 +225,23 @@ class _HomePageState extends State<HomePage> {
             (route == AppRoutes.notifications || route == AppRoutes.profile)) {
           showDialog(
             context: context,
-            builder:
-                (context) => AlertDialog(
-                  title: const Text('تنبيه'),
-                  content: const Text(
-                    'يرجى تسجيل الدخول للوصول إلى هذه الميزة',
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('إلغاء'),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        Navigator.pushNamed(context, AppRoutes.login);
-                      },
-                      child: const Text('تسجيل الدخول'),
-                    ),
-                  ],
+            builder: (context) => AlertDialog(
+              title: const Text('تنبيه'),
+              content: const Text('يرجى تسجيل الدخول للوصول إلى هذه الميزة'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('إلغاء'),
                 ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    Navigator.pushNamed(context, AppRoutes.login);
+                  },
+                  child: const Text('تسجيل الدخول'),
+                ),
+              ],
+            ),
           );
         } else if (route != null) {
           AppRoutes.navigateTo(context, route);
@@ -235,7 +268,7 @@ class _HomePageState extends State<HomePage> {
             );
           },
           child: const Text(
-            'فتح صفحة تمويلك (متاح للمستخدمين المسجلين فقط)',
+            'تسجيل الدخول للوصول إلى جميع الميزات',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w600,
@@ -247,26 +280,8 @@ class _HomePageState extends State<HomePage> {
       );
     }
 
-    // للمستخدمين المسجلين، نعرض زر التبديل كالمعتاد
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: GestureDetector(
-        onTap:
-            () => setState(() {
-              _showWebView = !_showWebView;
-              if (_showWebView) _webViewController.reload();
-            }),
-        child: Text(
-          _showWebView ? 'إغلاق الويب فيو' : 'فتح صفحة تمويلك',
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-            color: Colors.teal,
-            decoration: TextDecoration.underline,
-          ),
-        ),
-      ),
-    );
+    // للمستخدمين المسجلين، لا نعرض أي زر أو label
+    return const SizedBox.shrink();
   }
 
   Widget _buildWebView() {
@@ -307,11 +322,90 @@ class _HomePageState extends State<HomePage> {
             controller: _pageController,
             onPageChanged: (int page) => setState(() => _currentPage = page),
             itemCount: _bannerImages.length,
-            itemBuilder:
-                (context, index) => Image.asset(
-                  'assets/images/${_bannerImages[index]}',
-                  fit: BoxFit.cover,
-                ),
+            itemBuilder: (context, index) {
+              return Stack(
+                children: [
+                  Image.asset(
+                    'assets/images/${_bannerImages[index]}',
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                  ),
+                  if (index == 1) // فقط على صورة c2.png
+                    Positioned(
+                      bottom: 32,
+                      left: 0,
+                      right: 0,
+                      child: Center(
+                        child: SizedBox(
+                          width: 240,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              AppRoutes.navigateTo(
+                                context,
+                                AppRoutes.projectOwnerSubscription,
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.orange,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 6,
+                              shadowColor: Colors.black26,
+                            ),
+                            child: const Text(
+                              'اشترك الآن في باقة صاحب المشروع',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                  if (index == 2) // فقط على صورة c3.png
+                    Positioned(
+                      bottom: 32,
+                      left: 0,
+                      right: 0,
+                      child: Center(
+                        child: SizedBox(
+                          width: 220,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              AppRoutes.navigateTo(
+                                context,
+                                AppRoutes.investorSubscription,
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF03DAC6),
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 6,
+                              shadowColor: Colors.black26,
+                            ),
+                            child: const Text(
+                              'اشترك الآن في باقة مستثمر',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
           ),
           Positioned(
             bottom: 10,
@@ -349,17 +443,15 @@ class _HomePageState extends State<HomePage> {
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         itemCount: categories.length,
-        itemBuilder:
-            (context, index) => Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: ChoiceChip(
-                label: Text(categories[index]),
-                selected: selectedCategory == categories[index],
-                onSelected:
-                    (selected) =>
-                        setState(() => selectedCategory = categories[index]),
-              ),
-            ),
+        itemBuilder: (context, index) => Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: ChoiceChip(
+            label: Text(categories[index]),
+            selected: selectedCategory == categories[index],
+            onSelected: (selected) =>
+                setState(() => selectedCategory = categories[index]),
+          ),
+        ),
       ),
     );
   }
@@ -402,10 +494,9 @@ class _HomePageState extends State<HomePage> {
     final projects = List<Map<String, dynamic>>.from(data ?? []);
     if (projects.isEmpty) return _buildEmptyState();
 
-    final filteredProjects =
-        selectedCategory == 'جميع التخصصات'
-            ? projects
-            : projects.where((p) => p['category'] == selectedCategory).toList();
+    final filteredProjects = selectedCategory == 'جميع التخصصات'
+        ? projects
+        : projects.where((p) => p['category'] == selectedCategory).toList();
 
     return ListView.builder(
       itemCount: filteredProjects.length,
@@ -476,7 +567,8 @@ class _HomePageState extends State<HomePage> {
   void _handleBottomNavTap(int index) {
     switch (index) {
       case 1:
-        AppRoutes.navigateTo(context, AppRoutes.explore);
+        // استخدام Navigator مباشرة بدلاً من AppRoutes للتأكد من عمل التنقل
+        Navigator.pushNamed(context, '/explore');
         break;
       case 2:
         AppRoutes.navigateTo(context, AppRoutes.createProject);

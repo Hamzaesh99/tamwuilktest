@@ -95,8 +95,10 @@ class WelcomeScreenState extends State<WelcomeScreen>
               right: 0,
               child: Container(
                 width: 130,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 10,
+                ),
                 child: const Text(
                   // Make Text const
                   "Tamwuilk",
@@ -119,34 +121,41 @@ class WelcomeScreenState extends State<WelcomeScreen>
                 return Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    TweenAnimationBuilder<double>(
-                      tween: Tween<double>(begin: 0.8, end: 1.0),
-                      duration: const Duration(milliseconds: 500),
-                      curve: Curves.easeOutCubic,
-                      builder: (context, value, child) {
-                        return Transform.scale(
-                          scale: value,
-                          child: Container(
-                            width: 220,
-                            height: 220,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(20),
-                              boxShadow: const [
-                                BoxShadow(
-                                  color: Color.fromRGBO(0, 0, 0, 0.3),
-                                  blurRadius: 15,
-                                  spreadRadius: 2,
+                    Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        TweenAnimationBuilder<double>(
+                          tween: Tween<double>(begin: 0.8, end: 1.0),
+                          duration: const Duration(milliseconds: 500),
+                          curve: Curves.easeOutCubic,
+                          builder: (context, value, child) {
+                            return Transform.scale(
+                              scale: value,
+                              child: Container(
+                                width: 220,
+                                height: 220,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(20),
+                                  boxShadow: const [
+                                    BoxShadow(
+                                      color: Color.fromRGBO(0, 0, 0, 0.3),
+                                      blurRadius: 15,
+                                      spreadRadius: 2,
+                                    ),
+                                  ],
+                                  image: DecorationImage(
+                                    image: AssetImage(
+                                      'assets/images/${_imageNames[index]}',
+                                    ),
+                                    fit: BoxFit.cover,
+                                  ),
                                 ),
-                              ],
-                              image: DecorationImage(
-                                image: AssetImage(
-                                    'assets/images/${_imageNames[index]}'),
-                                fit: BoxFit.cover,
                               ),
-                            ),
-                          ),
-                        );
-                      },
+                            );
+                          },
+                        ),
+
+                      ],
                     ),
                     const SizedBox(height: 20),
                     TweenAnimationBuilder<double>(
@@ -160,16 +169,24 @@ class WelcomeScreenState extends State<WelcomeScreen>
                             offset: Offset(0, 20 * (1 - value)),
                             child: Container(
                               margin: const EdgeInsets.symmetric(
-                                  horizontal: 20, vertical: 15),
+                                horizontal: 20,
+                                vertical: 15,
+                              ),
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 20, vertical: 15),
+                                horizontal: 20,
+                                vertical: 15,
+                              ),
                               decoration: BoxDecoration(
                                 color: Colors.white, // لون الخلفية أبيض
                                 borderRadius: BorderRadius.circular(15),
                                 boxShadow: const [
                                   BoxShadow(
-                                    color:
-                                        Color.fromRGBO(0, 0, 0, 0.1), // ظل خفيف
+                                    color: Color.fromRGBO(
+                                      0,
+                                      0,
+                                      0,
+                                      0.1,
+                                    ), // ظل خفيف
                                     blurRadius: 5,
                                     spreadRadius: 1,
                                   ),
@@ -181,7 +198,11 @@ class WelcomeScreenState extends State<WelcomeScreen>
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
                                   color: Color.fromRGBO(
-                                      8, 225, 215, 1), // لون فيروزي
+                                    8,
+                                    225,
+                                    215,
+                                    1,
+                                  ), // لون فيروزي
                                   letterSpacing: 0.5,
                                 ),
                                 textAlign: TextAlign.center,
@@ -253,7 +274,7 @@ class CustomPageIndicator extends StatelessWidget {
                       color: Colors.black.withAlpha(51),
                       blurRadius: 4,
                       spreadRadius: 1,
-                    )
+                    ),
                   ]
                 : null,
           ),
@@ -267,11 +288,7 @@ class CustomNavButton extends StatelessWidget {
   final VoidCallback onTap;
   final String text;
 
-  const CustomNavButton({
-    super.key,
-    required this.onTap,
-    required this.text,
-  });
+  const CustomNavButton({super.key, required this.onTap, required this.text});
 
   @override
   Widget build(BuildContext context) {
@@ -291,7 +308,7 @@ class CustomNavButton extends StatelessWidget {
               blurRadius: 12,
               spreadRadius: 2,
               offset: Offset(0, 4),
-            )
+            ),
           ],
         ),
         child: Center(

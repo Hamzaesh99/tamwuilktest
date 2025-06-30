@@ -115,10 +115,12 @@ class ProfileService {
           .single();
 
       return UserProfile.fromMap(response);
-    } catch (error) {
+    } catch (error, stackTrace) {
       LoggerService.error(
         'خطأ في الحصول على الملف الشخصي: $error',
         tag: 'ProfileService',
+        exception: error,
+        stackTrace: stackTrace,
       );
       return null;
     }

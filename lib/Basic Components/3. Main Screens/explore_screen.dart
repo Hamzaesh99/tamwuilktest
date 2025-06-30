@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:tamwuilktest/core/shared/constants/app_colors.dart';
 import 'package:tamwuilktest/core/shared/utils/user_role_manager.dart';
-import 'package:tamwuilktest/core/shared/utils/state_manager.dart';
 import 'package:tamwuilktest/core/shared/models/user_model.dart';
+import 'package:tamwuilktest/core/shared/utils/user_provider.dart';
 
 import 'notifications_screen.dart';
 
@@ -211,7 +211,21 @@ class ExploreScreenState extends State<ExploreScreen>
     super.build(context);
 
     final userProvider = Provider.of<UserProvider>(context);
-    final User? currentUser = userProvider.currentUser;
+    final appUser = userProvider.currentUser;
+
+    // تحويل AppUser إلى User لاستخدامه مع UserRoleManager
+    final User? currentUser = appUser != null
+        ? User(
+            id: appUser.id,
+            name: '',
+            email: appUser.email,
+            createdAt: DateTime.now(),
+            userRole: appUser.userRole ?? 'investor',
+            accountType: appUser.userRole == 'project_owner'
+                ? 'project_owner'
+                : 'investor',
+          )
+        : null;
 
     final bool isInvestor =
         currentUser != null && UserRoleManager.isInvestor(currentUser);
@@ -299,161 +313,150 @@ class ExploreScreenState extends State<ExploreScreen>
       );
     }
 
-    return RefreshIndicator(
-      onRefresh: _loadProjects,
-      child: CustomScrollView(
-        controller: _scrollController,
-        slivers: [
-          _buildFilters(),
-          _buildProjectsList(isInvestor, isProjectOwner),
-          if (_isLoadingMore)
-            const SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.all(16.0),
-                child: Center(child: CircularProgressIndicator()),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFilters() {
-    return SliverToBoxAdapter(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            _buildCategoryFilter(),
-            const SizedBox(height: 12),
-            _buildSortFilter(),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCategoryFilter() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha((255 * 0.05).round()),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: DropdownButtonFormField<String>(
-        value: _selectedCategory,
-        decoration: InputDecoration(
-          labelText: 'تصفية حسب التخصص',
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none,
-          ),
-          filled: true,
-          fillColor: Colors.white,
-        ),
-        items: _categories.map((category) {
-          return DropdownMenuItem(value: category, child: Text(category));
-        }).toList(),
-        onChanged: _onCategoryChanged,
-      ),
-    );
-  }
-
-  Widget _buildSortFilter() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha((255 * 0.05).round()),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: DropdownButtonFormField<String>(
-        value: _sortBy,
-        decoration: InputDecoration(
-          labelText: 'ترتيب حسب',
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none,
-          ),
-          filled: true,
-          fillColor: Colors.white,
-        ),
-        items: const [
-          DropdownMenuItem(value: 'الأحدث', child: Text('الأحدث')),
-          DropdownMenuItem(value: 'الأقدم', child: Text('الأقدم')),
-          DropdownMenuItem(
-            value: 'الأعلى تقييماً',
-            child: Text('الأعلى تقييماً'),
-          ),
-          DropdownMenuItem(
-            value: 'الأكثر تمويلاً',
-            child: Text('الأكثر تمويلاً'),
-          ),
-        ],
-        onChanged: _onSortChanged,
-      ),
-    );
-  }
-
-  Widget _buildProjectsList(bool isInvestor, bool isProjectOwner) {
     if (_projects.isEmpty) {
-      return const SliverFillRemaining(
-        child: Center(
-          child: Text(
-            'لا توجد مشاريع متاحة حالياً',
-            style: TextStyle(fontSize: 16, color: Colors.grey),
-          ),
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.search_off, size: 64, color: Colors.grey),
+            const SizedBox(height: 16),
+            const Text(
+              'لا توجد مشاريع متاحة',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'جرب تغيير معايير البحث أو عد لاحقاً',
+              style: TextStyle(color: Colors.grey),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: _loadProjects,
+              child: const Text('تحديث'),
+            ),
+          ],
         ),
       );
     }
 
-    return SliverPadding(
-      padding: const EdgeInsets.all(16.0),
-      sliver: SliverList(
-        delegate: SliverChildBuilderDelegate((context, index) {
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 16.0),
-            child: ProjectCard(
-              project: _projects[index],
-              isInvestor: isInvestor,
-              isProjectOwner: isProjectOwner,
-              onTap: () => _navigateToProjectDetails(
-                context,
-                _projects[index],
-                isInvestor,
-                isProjectOwner,
-              ),
+    return Column(
+      children: [
+        _buildFilters(),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _loadProjects,
+            child: ListView.builder(
+              controller: _scrollController,
+              padding: const EdgeInsets.all(16),
+              itemCount: _projects.length + (_isLoadingMore ? 1 : 0),
+              itemBuilder: (context, index) {
+                if (index == _projects.length) {
+                  return const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(8.0),
+                      child: CircularProgressIndicator(),
+                    ),
+                  );
+                }
+
+                final project = _projects[index];
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: ProjectCard(
+                    project: project,
+                    onTap: () => Navigator.pushNamed(
+                      context,
+                      '/project-details',
+                      arguments: {'project': project},
+                    ),
+                    isInvestor: isInvestor,
+                    isProjectOwner: isProjectOwner,
+                  ),
+                );
+              },
             ),
-          );
-        }, childCount: _projects.length),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFilters() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 13, red: null, green: null, blue: null),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'تصفية المشاريع',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _buildDropdown(
+                  'التخصص',
+                  _selectedCategory,
+                  _categories,
+                  _onCategoryChanged,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: _buildDropdown('ترتيب حسب', _sortBy, const [
+                  'الأحدث',
+                  'الأقدم',
+                  'المبلغ الأعلى',
+                  'المبلغ الأقل',
+                ], _onSortChanged),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 
-  void _navigateToProjectDetails(
-    BuildContext context,
-    Project project,
-    bool isInvestor,
-    bool isProjectOwner,
+  Widget _buildDropdown(
+    String label,
+    String value,
+    List<String> items,
+    void Function(String?) onChanged,
   ) {
-    Navigator.pushNamed(
-      context,
-      '/project_details',
-      arguments: {
-        'project': project,
-        'canInvest': isInvestor && !isProjectOwner,
-      },
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+        const SizedBox(height: 4),
+        Container(
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey[300]!),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: DropdownButton<String>(
+            value: value,
+            isExpanded: true,
+            underline: const SizedBox(),
+            icon: const Icon(Icons.keyboard_arrow_down),
+            items: items.map((String item) {
+              return DropdownMenuItem<String>(value: item, child: Text(item));
+            }).toList(),
+            onChanged: onChanged,
+          ),
+        ),
+      ],
     );
   }
 
@@ -467,16 +470,16 @@ class ExploreScreenState extends State<ExploreScreen>
 /// بطاقة عرض المشروع
 class ProjectCard extends StatelessWidget {
   final Project project;
+  final VoidCallback onTap;
   final bool isInvestor;
   final bool isProjectOwner;
-  final VoidCallback onTap;
 
   const ProjectCard({
     super.key,
     required this.project,
+    required this.onTap,
     required this.isInvestor,
     required this.isProjectOwner,
-    required this.onTap,
   });
 
   @override
@@ -494,9 +497,7 @@ class ProjectCard extends StatelessWidget {
             children: [
               _buildHeader(),
               const SizedBox(height: 12),
-              _buildDescription(),
-              const SizedBox(height: 16),
-              _buildProgress(),
+              _buildBody(context),
               const SizedBox(height: 16),
               _buildFooter(context),
             ],
@@ -508,94 +509,77 @@ class ProjectCard extends StatelessWidget {
 
   Widget _buildHeader() {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                project.title,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withAlpha((255 * 0.1).round()),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Text(
-                  project.category,
-                  style: TextStyle(
-                    color: AppColors.primary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: Colors.amber.withAlpha((255 * 0.1).round()),
-            borderRadius: BorderRadius.circular(16),
+            color: AppColors.primary.withValues(alpha: 26, red: null, green: null, blue: null),
+            borderRadius: BorderRadius.circular(4),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                project.rating.toStringAsFixed(1),
-                style: TextStyle(
-                  color: Colors.amber.shade800,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(width: 4),
-              Icon(Icons.star, size: 16, color: Colors.amber.shade800),
-            ],
+          child: Text(
+            project.category,
+            style: const TextStyle(
+              color: AppColors.primary,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
           ),
+        ),
+        const Spacer(),
+        Row(
+          children: [
+            const Icon(Icons.star, color: Colors.amber, size: 16),
+            const SizedBox(width: 4),
+            Text(
+              project.rating.toString(),
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              '(${project.reviewCount})',
+              style: TextStyle(color: Colors.grey[600], fontSize: 12),
+            ),
+          ],
         ),
       ],
     );
   }
 
-  Widget _buildDescription() {
-    return Text(
-      project.description,
-      style: TextStyle(color: Colors.grey[600], height: 1.5),
-      maxLines: 3,
-      overflow: TextOverflow.ellipsis,
-    );
-  }
-
-  Widget _buildProgress() {
-    final progressPercentage = (project.progress * 100).toInt();
-    Color progressColor = AppColors.primary;
-
-    if (progressPercentage < 30) {
-      progressColor = Colors.red.shade400;
-    } else if (progressPercentage < 70) {
-      progressColor = Colors.orange;
-    }
+  Widget _buildBody(BuildContext context) {
+    final Color progressColor = project.progress < 0.3
+        ? Colors.red
+        : project.progress < 0.7
+        ? Colors.orange
+        : Colors.green;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Text(
+          project.title,
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          project.description,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(color: Colors.grey[700]),
+        ),
+        const SizedBox(height: 16),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('التمويل المكتمل', style: TextStyle(color: Colors.grey[600])),
             Text(
-              '$progressPercentage%',
-              style: const TextStyle(fontWeight: FontWeight.bold),
+              'نسبة الإنجاز',
+              style: TextStyle(color: Colors.grey[600], fontSize: 12),
+            ),
+            Text(
+              '${(project.progress * 100).toInt()}%',
+              style: TextStyle(
+                color: progressColor,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ],
         ),

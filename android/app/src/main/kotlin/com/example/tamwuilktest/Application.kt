@@ -8,6 +8,8 @@ class MainApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         // تهيئة Facebook SDK
+        FacebookSdk.setApplicationId(getString(R.string.facebook_app_id))
+        FacebookSdk.setClientToken(getString(R.string.facebook_client_token))
         FacebookSdk.sdkInitialize(applicationContext)
         AppEventsLogger.activateApp(this)
     }

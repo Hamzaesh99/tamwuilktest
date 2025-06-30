@@ -1,7 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'logger_service.dart';
 import 'web_auth_service.dart';
 
@@ -84,37 +83,33 @@ class AuthService {
         tag: 'AuthService',
       );
 
-      // إنشاء حساب جديد في Supabase
-      final response = await _supabase.auth.signUp(
+      // استخدام signInWithOtp بدلاً من signUp لتجنب رسائل تأكيد التسجيل
+      final redirectUrl =
+          emailRedirectTo ?? 'com.example.tamwuilk://home_screen';
+
+      // إرسال رابط سحري للبريد الإلكتروني
+      await _supabase.auth.signInWithOtp(
         email: email,
-        password: password,
-        data: {'name': name, 'account_type': accountType},
-        emailRedirectTo: emailRedirectTo,
+        emailRedirectTo: redirectUrl,
       );
 
-      if (response.user == null) {
-        return {'success': false, 'error': 'فشل في إنشاء الحساب', 'user': null};
-      }
+      // إنشاء بيانات المستخدم التي سيتم تخزينها بعد تسجيل الدخول
+      final userData = {'email': email, 'name': name, 'user_role': accountType};
 
       LoggerService.info(
-        'تم إنشاء الحساب بنجاح: ${response.user?.email}',
+        'تم إرسال رابط سحري بنجاح: $email',
         tag: 'AuthService',
       );
 
-      return {
-        'success': true,
-        'user': {
-          'id': response.user?.id,
-          'email': response.user?.email,
-          'name': name,
-          'account_type': accountType,
-        },
-      };
+      return {'success': true, 'user': userData};
     } catch (error) {
-      LoggerService.error('خطأ في إنشاء الحساب: $error', tag: 'AuthService');
+      LoggerService.error(
+        'خطأ في إرسال الرابط السحري: $error',
+        tag: 'AuthService',
+      );
       return {
         'success': false,
-        'error': 'حدث خطأ أثناء إنشاء الحساب',
+        'error': 'حدث خطأ أثناء إرسال الرابط السحري',
         'user': null,
       };
     }
@@ -244,86 +239,26 @@ class AuthService {
   /// تسجيل الدخول باستخدام حساب Facebook
   /// يستخدم flutter_facebook_auth للمصادقة المباشرة مع Facebook
   /// ثم يقوم بتسجيل الدخول في Supabase باستخدام رمز الوصول
-  Future<Map<String, dynamic>> signInWithFacebook() async {
+  static Future<Map<String, dynamic>> signInWithFacebook({
+    required String userRole,
+  }) async {
     try {
       LoggerService.info(
         'بدء عملية تسجيل الدخول عبر فيسبوك...',
         tag: 'AuthService',
       );
 
-      // تسجيل الدخول باستخدام Facebook
-      final LoginResult result = await FacebookAuth.instance.login(
-        permissions: ['email', 'public_profile'], // الصلاحيات المطلوبة
+      final success = await _supabase.auth.signInWithOAuth(
+        OAuthProvider.facebook,
+        redirectTo: 'com.example.tamwuilk://home_screen?user_role=$userRole',
+        authScreenLaunchMode: LaunchMode.externalApplication,
       );
 
-      // التحقق من حالة تسجيل الدخول
-      if (result.status != LoginStatus.success) {
-        LoggerService.warning(
-          'تم إلغاء تسجيل الدخول عبر Facebook أو فشل',
-          tag: 'AuthService',
-        );
-        return {
-          'success': false,
-          'error': 'فشل تسجيل الدخول عبر Facebook: ${result.status}',
-          'user': null,
-        };
+      if (!success) {
+        throw 'فشل في بدء عملية تسجيل الدخول عبر Facebook';
       }
 
-      // التحقق من وجود رمز الوصول
-      if (result.accessToken == null) {
-        LoggerService.error(
-          'لم يتم العثور على رمز الوصول من Facebook',
-          tag: 'AuthService',
-        );
-        return {
-          'success': false,
-          'error': 'لم يتم العثور على رمز الوصول',
-          'user': null,
-        };
-      }
-
-      LoggerService.info(
-        'تم الحصول على رمز الوصول من Facebook بنجاح',
-        tag: 'AuthService',
-      );
-
-      // الحصول على بيانات المستخدم من Facebook
-      final userData = await FacebookAuth.instance.getUserData();
-
-      // تسجيل الدخول في Supabase باستخدام رمز الوصول من Facebook
-      final AuthResponse response = await _supabase.auth.signInWithIdToken(
-        provider: OAuthProvider.facebook,
-        idToken: result.accessToken!.tokenString,
-      );
-
-      if (response.user == null) {
-        LoggerService.warning(
-          'لم يتم إرجاع بيانات المستخدم من Supabase',
-          tag: 'AuthService',
-        );
-        return {
-          'success': false,
-          'error': 'فشل تسجيل الدخول: لم يتم إرجاع بيانات المستخدم',
-          'user': null,
-        };
-      }
-
-      LoggerService.info(
-        'تم تسجيل الدخول في Supabase بنجاح',
-        tag: 'AuthService',
-      );
-
-      // دمج بيانات المستخدم من Facebook و Supabase
-      return {
-        'success': true,
-        'user': {
-          'id': response.user!.id,
-          'email': response.user!.email,
-          'name': userData['name'],
-          'picture': userData['picture']?['data']?['url'],
-        },
-        'error': null,
-      };
+      return {'success': true, 'user': null};
     } catch (error) {
       String errorMessage =
           'خطأ في تسجيل الدخول عبر Facebook: ${error.toString()}';

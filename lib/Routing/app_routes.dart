@@ -14,6 +14,9 @@ import '../Basic Components/3. Main Screens/project_create_screen.dart';
 import '../Basic Components/3. Main Screens/project_create_details_screen.dart';
 import '../Basic Components/3. Main Screens/project_detail_screen.dart';
 import '../widgets/auth_state_widget.dart';
+import '../Basic Components/3. Main Screens/profile_screen.dart';
+import '../Basic Components/3. Main Screens/investor_subscription_screen.dart';
+import '../Basic Components/3. Main Screens/project_owner_subscription_screen.dart';
 
 class AppRoutes {
   static const String splash = '/';
@@ -39,6 +42,8 @@ class AppRoutes {
   static const String verifyEmail = '/verify-email'; // Add verify email route
   static const String productDetails =
       '/product-details'; // Add product details route
+  static const String investorSubscription = '/investor-subscription';
+  static const String projectOwnerSubscription = '/project-owner-subscription';
 
   static Map<String, WidgetBuilder> getRoutes() {
     return {
@@ -81,6 +86,10 @@ class AppRoutes {
         // We will modify AuthCallbackScreen to navigate to /success on success.
         return const AuthCallbackScreen();
       },
+      profile: (context) => const ProfileScreen(),
+      investorSubscription: (context) => const InvestorSubscriptionScreen(),
+      projectOwnerSubscription: (context) =>
+          const ProjectOwnerSubscriptionScreen(),
     };
   }
 

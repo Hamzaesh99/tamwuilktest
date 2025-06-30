@@ -73,55 +73,61 @@ class _AccountTypeSelectorState extends State<AccountTypeSelector> {
   }) {
     final isSelected = _selectedAccountType == value;
 
-    return InkWell(
-      onTap: () {
-        setState(() {
-          _selectedAccountType = value;
-        });
-        widget.onAccountTypeSelected(value);
-      },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              color: isSelected ? Theme.of(context).primaryColor : Colors.grey,
-              size: 28,
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: isSelected ? Theme.of(context).primaryColor : null,
-                    ),
-                  ),
-                  Text(
-                    subtitle,
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                  ),
-                ],
+    return Semantics(
+      selected: isSelected,
+      button: true,
+      label: title,
+      child: InkWell(
+        onTap: () {
+          setState(() {
+            _selectedAccountType = value;
+          });
+          widget.onAccountTypeSelected(value);
+        },
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+          child: Row(
+            children: [
+              Icon(
+                icon,
+                color: isSelected ? Theme.of(context).primaryColor : Colors.grey,
+                size: 28,
               ),
-            ),
-            Radio<String>(
-              value: value,
-              groupValue: _selectedAccountType,
-              onChanged: (newValue) {
-                if (newValue != null) {
-                  setState(() {
-                    _selectedAccountType = newValue;
-                  });
-                  widget.onAccountTypeSelected(newValue);
-                }
-              },
-              activeColor: Theme.of(context).primaryColor,
-            ),
-          ],
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: isSelected ? Theme.of(context).primaryColor : null,
+                      ),
+                    ),
+                    Text(
+                      subtitle,
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                    ),
+                  ],
+                ),
+              ),
+              Radio<String>(
+                value: value,
+                groupValue: _selectedAccountType,
+                onChanged: (newValue) {
+                  if (newValue != null) {
+                    setState(() {
+                      _selectedAccountType = newValue;
+                    });
+                    widget.onAccountTypeSelected(newValue);
+                  }
+                },
+                activeColor: Theme.of(context).primaryColor,
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -162,7 +162,7 @@ class DeepLinkService {
         uri.queryParameters.containsKey('access_token') ||
         uri.queryParameters.containsKey('code') ||
         uri.path.contains('/auth/callback') ||
-        uri.path.contains('/login-callback');
+        uri.path.contains('/home_screen-callback');
   }
 
   /// التحقق إذا كان الرابط هو رابط إعادة تعيين كلمة المرور
@@ -188,7 +188,7 @@ class DeepLinkService {
       final code = uri.queryParameters['code'];
 
       // التعامل مع رابط Facebook الخاص
-      if (uri.path.contains('/login-callback') && code != null) {
+      if (uri.path.contains('/home_screen-callback') && code != null) {
         LoggerService.info(
           'معالجة رابط إعادة التوجيه من Facebook: $code',
           tag: 'DeepLinks',
